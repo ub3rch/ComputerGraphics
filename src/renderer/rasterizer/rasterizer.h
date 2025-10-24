@@ -55,16 +55,17 @@ namespace cg::renderer
 			std::shared_ptr<resource<RT>> in_render_target,
 			std::shared_ptr<resource<float>> in_depth_buffer)
 	{
-		if(in_render_target) {
+		if (in_render_target) {
 			render_target = in_render_target;
 		}
-		if(in_depth_buffer) {
+		if (in_depth_buffer){
 			depth_buffer = in_depth_buffer;
 		}
 	}
 
 	template<typename VB, typename RT>
-	inline void rasterizer<VB, RT>::set_viewport(size_t in_width, size_t in_height) {
+	inline void rasterizer<VB, RT>::set_viewport(size_t in_width, size_t in_height)
+	{
 		width = in_width;
 		height = in_height;
 	}
@@ -73,7 +74,7 @@ namespace cg::renderer
 	inline void rasterizer<VB, RT>::clear_render_target(
 			const RT& in_clear_value, const float in_depth)
 	{
-		for(size_t i=0; i<render_target->count(); ++i) {
+		for (std::size_t i = 0; i < render_target->count(); ++i){
 			render_target->item(i) = in_clear_value;
 			depth_buffer->item(i) = in_depth;
 		}
@@ -119,32 +120,30 @@ namespace cg::renderer
 			int2 vertex_b(static_cast<int>(vertices[1].v.x), static_cast<int>(vertices[1].v.y));
 			int2 vertex_c(static_cast<int>(vertices[2].v.x), static_cast<int>(vertices[2].v.y));
 
-			int2 min_vertex = (min(vertex_a, min(vertex_b, vertex_c)));
-			int2 max_vertex = (max(vertex_a, max(vertex_b, vertex_c)));
+			int2 min_vertex = min(vertex_a, min(vertex_b, vertex_c));
+			int2 max_vertex = max(vertex_a, max(vertex_b, vertex_c));
 
-			int2 min_border(0,0);
-			int2 max_border(width-1, height-1);
-
-			int2 min_aabb = clamp(min_vertex, min_border, max_border);
-			int2 max_aabb = clamp(max_vertex, min_border, max_border);
+			int2 min_border(0, 0);
+			int2 max_border(width - 1, height - 1);
 
 			float edge = static_cast<float>(edge_function(vertex_a, vertex_b, vertex_c));
 
-			for(int x = min_aabb.x; x<max_aabb.x; ++x) {
-				for(int y = min_aabb.y; y<max_aabb.y; ++y) {
-					int2 point(x,y);
+			int2 min_aabb = clamp(min_vertex, min_border, max_border);
+			int2 max_aabb = clamp(max_vertex, min_border, max_border);
+			for (int x = min_aabb.x; x < max_aabb.x; ++x) {
+				for (int y = min_aabb.y; y < max_aabb.y; ++y) {
+					int2 point{x, y};
 					float u = static_cast<float>(edge_function(vertex_b, vertex_c, point)) / edge;
 					float v = static_cast<float>(edge_function(vertex_c, vertex_a, point)) / edge;
 					float w = static_cast<float>(edge_function(vertex_a, vertex_b, point)) / edge;
-					if(u > 0 && v > 0 && w > 0) {
+					if (u >= 0 && v >= 0 && w >= 0) {
 						float depth = u * vertices[0].v.z +
-									  v * vertices[1].v.z +
-									  w * vertices[2].v.z;
-
-						if(depth_test(depth, x, y)) {
+							v * vertices[1].v.z +
+							w * vertices[2].v.z;
+						if (depth_test(depth, x, y)) {
 							auto result = pixel_shader(vertices[0], depth);
-							render_target->item(x,y) = RT::from_color(result);
-							depth_buffer->item(x,y) = depth;
+							render_target->item(x, y) = RT::from_color(result);
+							depth_buffer->item(x, y) = depth;
 						}
 					}
 				}
