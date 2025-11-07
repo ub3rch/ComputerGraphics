@@ -123,29 +123,27 @@ namespace cg::renderer
 			int2 min_vertex = min(vertex_a, min(vertex_b, vertex_c));
 			int2 max_vertex = max(vertex_a, max(vertex_b, vertex_c));
 
-			int2 min_border(0,0);
-			int2 max_border(width-1, height-1);
-
-			int2 min_aabb = clamp(min_vertex, min_border, max_border);
-			int2 max_aabb = clamp(max_vertex, min_border, max_border);
+			int2 min_border(0, 0);
+			int2 max_border(width - 1, height - 1);
 
 			float edge = static_cast<float>(edge_function(vertex_a, vertex_b, vertex_c));
 
-			for(int x = min_aabb.x; x<max_aabb.x; ++x) {
-				for(int y = min_aabb.y; y<max_aabb.y; ++y) {
-					int2 point(x,y);
+			int2 min_aabb = clamp(min_vertex, min_border, max_border);
+			int2 max_aabb = clamp(max_vertex, min_border, max_border);
+			for (int x = min_aabb.x; x < max_aabb.x; ++x) {
+				for (int y = min_aabb.y; y < max_aabb.y; ++y) {
+					int2 point{x, y};
 					float u = static_cast<float>(edge_function(vertex_b, vertex_c, point)) / edge;
 					float v = static_cast<float>(edge_function(vertex_c, vertex_a, point)) / edge;
 					float w = static_cast<float>(edge_function(vertex_a, vertex_b, point)) / edge;
-					if(u > 0 && v > 0 && w > 0) {
+					if (u >= 0 && v >= 0 && w >= 0) {
 						float depth = u * vertices[0].v.z +
-									  v * vertices[1].v.z +
-									  w * vertices[2].v.z;
-
-						if(depth_test(depth, x, y)) {
+							v * vertices[1].v.z +
+							w * vertices[2].v.z;
+						if (depth_test(depth, x, y)) {
 							auto result = pixel_shader(vertices[0], depth);
-							render_target->item(x,y) = RT::from_color(result);
-							depth_buffer->item(x,y) = depth;
+							render_target->item(x, y) = RT::from_color(result);
+							depth_buffer->item(x, y) = depth;
 						}
 					}
 				}
