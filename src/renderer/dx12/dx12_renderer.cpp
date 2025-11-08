@@ -38,7 +38,7 @@ void cg::renderer::dx12_renderer::update()
 	frame_duration = duration.count();
 	current_time = now;
 
-	cb.mvpMatrix = camera->get_dxm_mvp_Matrix();
+	cb.mwpMatrix = camera->get_dxm_mvp_matrix();
 	memcpy(constant_buffer_data_begin, &cb, sizeof(cb));
 }
 
@@ -198,7 +198,12 @@ void cg::renderer::dx12_renderer::create_root_signature(const D3D12_STATIC_SAMPL
 		THROW_IF_FAILED(res);
 	}
 
-	THROW_IF_FAILED(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&root_signature)));
+	THROW_IF_FAILED(device->CreateRootSignature(
+		0,
+		signature->GetBufferPointer(),
+		signature->GetBufferSize(),
+		IID_PPV_ARGS(&root_signature))
+	);
 }
 
 std::filesystem::path cg::renderer::dx12_renderer::get_shader_path()
@@ -298,7 +303,7 @@ void cg::renderer::dx12_renderer::copy_data(const void* buffer_data, UINT buffer
 		destination_resource->Map(
 			0, &read_range, reinterpret_cast<void**>(&buffer_data_begin))
 	);
-	memcpy(&buffer_data_begin, buffer_data, buffer_size);
+	memcpy(buffer_data_begin, buffer_data, buffer_size);
 	destination_resource->Unmap(0, 0);
 }
 
@@ -372,15 +377,13 @@ void cg::renderer::dx12_renderer::load_assets()
 		copy_data(ib_data->get_data(), ib_size, index_buffers[i]);
 		index_buffer_views[i] = create_index_buffer_view(index_buffers[i], ib_size);
 	}
-	
+
 	std::wstring cb_name(L"Constant buffer");
 	create_resource_on_upload_heap(constant_buffer, 64*1024, cb_name);
 	copy_data(&cb, sizeof(cb), constant_buffer);
 	CD3DX12_RANGE read_range(0, 0);
 	THROW_IF_FAILED(
-		constant_buffer->Map(0, &read_range, reinterpret_cast<void**>(&constant_buffer_data_begin))
-	);
-
+		constant_buffer->Map(0, &read_range, reinterpret_cast<void**>(&constant_buffer_data_begin)));
 	create_constant_buffer_view(constant_buffer, cbv_srv_heap.get_cpu_descriptor_handle());
 
 	THROW_IF_FAILED(command_list->Close());
