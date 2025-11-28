@@ -130,6 +130,42 @@ void cg::renderer::dx12_renderer::create_render_target_views()
 
 void cg::renderer::dx12_renderer::create_depth_buffer()
 {
+	CD3DX12_RESOURCE_DESC depth_buffer_desc{
+		D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+		0,
+		settings->width,
+		settings->height,
+		1, 1,
+		DXGI_FORMAT_D32_FLOAT,
+		1, 0,
+		D3D12_TEXTURE_LAYOUT_UNKNOWN,
+		D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL |
+		D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE
+	};
+
+	D3D12_CLEAR_VALUE clear_value{};
+	clear_value.Format = DXGI_FORMAT_D32_FLOAT;
+	clear_value.DepthStencil.Depth = 1.f;
+	clear_value.DepthStencil.Stencil = 0;
+
+	auto hp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+	THROW_IF_FAILED(device->CreateCommittedResource(
+		&hp,
+		D3D12_HEAP_FLAG_NONE,
+		&depth_buffer_desc,
+		D3D12_RESOURCE_STATE_DEPTH_WRITE,
+		&clear_value,
+		IID_PPV_ARGS(&depth_buffer)
+	));
+	depth_buffer->SetName(L"DepthBuffer");
+
+	dsv_heap.create_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+
+	device->CreateDepthStencilView(
+		depth_buffer.Get(),
+		nullptr,
+		dsv_heap.get_cpu_descriptor_handle()
+	);
 }
 
 void cg::renderer::dx12_renderer::create_command_allocators()
@@ -262,12 +298,15 @@ void cg::renderer::dx12_renderer::create_pso()
 	desc.RasterizerState.FrontCounterClockwise = TRUE;
 	desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
 	desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	desc.DepthStencilState.DepthEnable = FALSE;
+	desc.DepthStencilState.DepthEnable = TRUE;
+	desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 	desc.DepthStencilState.StencilEnable = FALSE;
 	desc.SampleMask = UINT_MAX;
 	desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	desc.NumRenderTargets = 1;
 	desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	desc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 	desc.SampleDesc.Count = 1;
 
 	THROW_IF_FAILED(device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipeline_state)));
@@ -427,7 +466,7 @@ void cg::renderer::dx12_renderer::load_assets()
 	THROW_IF_FAILED(command_list->Close());
 
 	ID3D12CommandList* command_lists[] = {command_list.Get()};
-	command_queue->ExecuteCommandLists(countof(command_lists), command_lists);
+	command_queue->ExecuteCommandLists(_countof(command_lists), command_lists);
 
 	THROW_IF_FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
 	fence_event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -464,9 +503,11 @@ void cg::renderer::dx12_renderer::populate_command_list()
 
 	// Drawing
 	auto rtv = rtv_heap.get_cpu_descriptor_handle(frame_index);
-	command_list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+	auto dsv = dsv_heap.get_cpu_descriptor_handle();
+	command_list->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 	const float clear_color[] = {0.f, 0.f, 0.f, 1.f};
 	command_list->ClearRenderTargetView(rtv, clear_color, 0, nullptr);
+	command_list->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
 	command_list->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	for(size_t s = 0; s<model->get_index_buffers().size(); s++) {
