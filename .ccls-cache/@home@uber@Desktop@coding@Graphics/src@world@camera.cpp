@@ -91,7 +91,7 @@ const DirectX::XMMATRIX cg::world::camera::get_dxm_view_matrix() const
 
 const DirectX::XMMATRIX cg::world::camera::get_dxm_projection_matrix() const
 {
-	return  DirectX::XMMatrixPerspectiveFovRH(angle_of_view, aspect_ration, z_near, z_far);
+	return  DirectX::XMMatrixPerspectiveFovRH(angle_of_view, aspect_ratio, z_near, z_far);
 }
 
 const DirectX::XMMATRIX camera::get_dxm_mvp_matrix() const
